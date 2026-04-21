@@ -1,0 +1,95 @@
+name: Dependency Update
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # minden hétfőn 06:00 UTC
+  workflow_dispatch:       # kézzel is indítható
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Collect available updates (before)
+        run: |
+          mvn --batch-mode versions:display-dependency-updates \
+            -DallowMajorUpdates=false \
+            -DgenerateBackupPoms=false \
+            2>&1 | grep '\->' | sed 's/.*INFO\] //' > /tmp/updates-summary.txt || true
+          cat /tmp/updates-summary.txt
+
+      - name: Apply dependency updates (minor + patch only)
+        run: |
+          mvn --batch-mode versions:use-latest-releases \
+            -DallowMajorUpdates=false \
+            -DgenerateBackupPoms=false
+
+      - name: Check if pom.xml changed
+        id: check
+        run: |
+          if git diff --quiet pom.xml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency updates found."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build to verify updates compile
+        if: steps.check.outputs.changed == 'true'
+        run: mvn --batch-mode clean package -q
+
+      - name: Build PR body
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          UPDATES=$(cat /tmp/updates-summary.txt)
+          DIFF=$(git diff pom.xml \
+            | grep '^[-+]' \
+            | grep -v '^---\|^+++' \
+            | grep -i 'version\|Version' || true)
+
+          cat <<EOF > /tmp/pr-body.md
+          ## Dependency updates
+
+          The following updates were found and applied:
+
+          \`\`\`
+          ${UPDATES}
+          \`\`\`
+
+          ### pom.xml diff (version lines)
+
+          \`\`\`diff
+          ${DIFF}
+          \`\`\`
+
+          > **Note for \`provided\` dependencies** (\`artemis-server\`, \`micrometer-core\`, \`slf4j-api\`):
+          > these must match the version shipped by your target Artemis broker.
+          > Verify the broker's \`lib/\` directory before merging.
+
+          Build: ✅ compiled successfully with the updated versions.
+          EOF
+
+      - name: Create Pull Request
+        if: steps.check.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update dependencies'
+          title: 'chore: dependency updates'
+          body-path: /tmp/pr-body.md
+          branch: deps/dependency-updates
+          delete-branch: true
+          labels: dependencies
