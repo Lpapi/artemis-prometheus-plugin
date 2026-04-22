@@ -27,7 +27,7 @@ An [Apache ActiveMQ Artemis](https://activemq.apache.org/components/artemis/) pl
 
 ```bash
 curl -L -o /path/to/broker/lib/artemis-prometheus-plugin.jar \
-  https://github.com/<your-username>/artemis-prometheus-plugin/releases/latest/download/artemis-prometheus-plugin-<version>.jar
+  https://github.com/Lpapi/artemis-prometheus-plugin/releases/latest/download/artemis-prometheus-plugin-<version>.jar
 ```
 
 2. Edit `broker/etc/broker.xml` — add or replace the `<metrics>` block inside `<core>`:
@@ -61,7 +61,7 @@ curl http://localhost:9404/metrics
 If you prefer to build the JAR yourself (requires JDK 17+, Maven 3.6+):
 
 ```bash
-git clone https://github.com/<your-username>/artemis-prometheus-plugin.git
+git clone https://github.com/Lpapi/artemis-prometheus-plugin.git
 cd artemis-prometheus-plugin
 mvn clean package
 cp target/artemis-prometheus-plugin-*.jar /path/to/broker/lib/
