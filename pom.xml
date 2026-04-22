@@ -15,6 +15,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <artemis.version>2.53.0</artemis.version>
         <micrometer.version>1.16.3</micrometer.version>
+        <sonar.projectKey>artemis-prometheus-plugin</sonar.projectKey>
+        <sonar.host.url>http://localhost:9000</sonar.host.url>
     </properties>
 
     <dependencies>

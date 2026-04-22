@@ -22,12 +22,13 @@ public class PrometheusMetricsPlugin implements ActiveMQMetricsPlugin {
 
     private transient PrometheusMeterRegistry registry;
     private transient MetricsHttpServer httpServer;
-    // S2095: JvmGcMetrics is AutoCloseable — field-ben tartjuk, stop()-ban zárjuk
+    // S2095: JvmGcMetrics is AutoCloseable — kept as a field and closed in stop()
     private transient JvmGcMetrics jvmGcMetrics;
 
     @Override
     public ActiveMQMetricsPlugin init(Map<String, String> options) {
         registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+        RegistryHolder.set(registry);
 
         new JvmMemoryMetrics().bindTo(registry);
         jvmGcMetrics = new JvmGcMetrics();
@@ -40,12 +41,14 @@ public class PrometheusMetricsPlugin implements ActiveMQMetricsPlugin {
             httpServer.start();
             int port = Integer.parseInt(options.getOrDefault("port", "9404"));
             boolean tls = Boolean.parseBoolean(options.getOrDefault("tls.enabled", "false"));
-            log.info("[PrometheusMetricsPlugin] /metrics elérhető: {}://0.0.0.0:{}/metrics",
+            log.info("[PrometheusMetricsPlugin] /metrics available at {}://0.0.0.0:{}/metrics",
                 tls ? "https" : "http", port);
         } catch (IOException | GeneralSecurityException e) {
             jvmGcMetrics.close();
-            throw new IllegalStateException("Prometheus metrics HTTP szerver indítása sikertelen", e);
+            throw new IllegalStateException("Failed to start Prometheus metrics HTTP server", e);
         }
+
+        Runtime.getRuntime().addShutdownHook(new Thread(this::stop, "prometheus-metrics-shutdown"));
 
         return this;
     }
